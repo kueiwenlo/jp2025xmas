@@ -1,15 +1,110 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/pwa-192x192.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#111827" />
-    <link rel="manifest" href="/manifest.webmanifest">
-    <title>Tokyo 2025 — jp2025xmas</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
-</html>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>東京行程計畫書 - 單一 HTML 版</title>
+  <!-- 載入 Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 載入 Lucide Icons 腳本 - 改為 UMD 模式，確保 createIcons 函數可用 -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- 載入 Firebase SDK (仍使用模組匯入) -->
+  <script type="module">
+    import * as firebaseApp from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import * as firebaseAuth from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import * as firebaseFirestore from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    window.firebase = {
+      app: firebaseApp,
+      auth: firebaseAuth,
+      firestore: firebaseFirestore
+    };
+  </script>
+  <style>
+    @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+    body { font-family: 'Inter', sans-serif; }
+
+    /* 底部導航圖示的短暫彈跳效果 */
+    .animate-bounce-short {
+      animation: bounce-short 0.5s ease-in-out infinite alternate;
+    }
+    @keyframes bounce-short {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-3px); }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+  <div id="app" class="min-h-screen pb-24 max-w-md mx-auto">
+    <!-- App content will be rendered here by JavaScript -->
+    <div class="h-96 flex items-center justify-center text-gray-500">載入中...</div>
+  </div>
+
+  <!-- QR Code Modal (Hidden by default) -->
+  <div id="qr-modal" class="fixed inset-0 z-[60] bg-black/90 hidden flex-col items-center justify-center p-6 animate-fade-in backdrop-blur-sm" onclick="window.closeQR()">
+    <div class="bg-white p-4 rounded-3xl max-w-sm w-full shadow-2xl" onclick="event.stopPropagation()">
+      <div class="text-center mb-4"><h3 id="qr-title" class="font-bold text-xl"></h3></div>
+      <div class="aspect-square bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center border-2 border-dashed border-gray-200">
+         <img id="qr-image" src="" alt="QR Code" class="w-full h-full object-contain" />
+      </div>
+      <button onclick="window.closeQR()" class="mt-6 w-full bg-rose-500 text-white font-bold py-3 rounded-xl hover:bg-rose-600">關閉</button>
+    </div>
+  </div>
+
+  <script type="module">
+    // --- 資料定義 ---
+    const itineraryData = [
+      { day: 'Day 1', date: '12/3 (三)', title: '出發東京 & 澀谷之夜', icon: 'Plane', details: [
+        { time: '11:00', event: '家中接駁', note: '肯驛國際', desc: '專車接送前往機場，開啟美好旅程。', mapUrl: 'https://maps.google.com' },
+        { time: '12:00', event: '寰宇禮遇通關', note: '抵達機場', desc: '享受快速通關服務，免去排隊煩惱。', mapUrl: 'https://maps.app.goo.gl/TaoyuanAirport' },
+        { time: '13:55', event: 'TR874 起飛', note: '往東京 NRT', desc: '搭乘酷航前往成田機場，飛行時間約 3.5 小時。', mapUrl: 'https://maps.app.goo.gl/TaoyuanAirport' },
+        { time: '17:55', event: '抵達東京成田', note: '入境手續', desc: '抵達日本，辦理入境與領取行李。', mapUrl: 'https://maps.app.goo.gl/NaritaAirport' },
+        { time: '18:45', event: 'NEX 46 發車', note: 'Car 7, Seat: 4C, 4D', desc: '成田特快直達澀谷，舒適便捷。', mapUrl: 'https://maps.app.goo.gl/NaritaStation' },
+        { time: '20:08', event: '抵達澀谷', note: '前往飯店', desc: '東京潮流中心，著名的十字路口所在地。', mapUrl: 'https://maps.app.goo.gl/ShibuyaStation' },
+        { time: 'Check-in', event: 'the onefive Tokyo Shibuya', note: '飯店入住', desc: '位於澀谷中心，設計時尚，交通極其便利。', mapUrl: 'https://maps.app.goo.gl/Shibuya' },
+        { time: '20:40', event: 'CBD SHOP -YANAGI-', note: '澀谷本店', desc: '合法 CBD 專賣店，提供放鬆身心的相關產品體驗。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=CBD+SHOP+YANAGI+Shibuya' },
+        { time: '21:30', event: 'Itameshi Sakaba Grazie', note: '澀谷中心街店', desc: '結合義式料理與日式居酒屋風格，氛圍熱鬧，適合小酌。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=New+Itameshi+Sakaba+Grazie+Shibuya' }
+      ]},
+      { day: 'Day 2', date: '12/4 (四)', title: '前進富士山 & 自駕開始', icon: 'Car', details: [
+        { time: '10:00', event: 'かつお食堂', note: '柴魚片飯專門店', desc: '現削柴魚片搭配熱飯，極致簡單的鮮美滋味，人氣排隊早餐。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Katsuo+Shokudo' },
+        { time: '13:30', event: '高速巴士出發', note: 'Mark City 5F', desc: '前往河口湖的直達巴士，沿途欣賞風景。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Shibuya+Mark+City+Bus+Terminal' },
+        { time: '15:37', event: '抵達河口湖', note: '轉乘火車', desc: '富士山腳下的美麗湖泊，轉乘富士急行線至富士山站。', mapUrl: 'https://maps.app.goo.gl/KawaguchikoStation' },
+        { time: '16:00', event: 'ORIX 租車取車', note: '富士山站前店', desc: '預約單號 #684258558，開始自駕之旅。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=ORIX+Rent+a+Car+Fujisan+Station' },
+        { time: '17:00', event: '富士吉田本町通り', note: '商店街攝影', desc: '昭和風情商店街，背景就是巨大的富士山，絕佳打卡點。', mapUrl: 'https://maps.app.goo.gl/HonchoStreet' },
+        { time: 'Night', event: 'Hotel Mt. Fuji', note: '富士山大飯店', desc: '位於山腰的經典飯店，擁有絕佳的富士山與山中湖景觀。', mapUrl: 'https://maps.app.goo.gl/MtFujiHotel' }
+      ]},
+      { day: 'Day 3', date: '12/5 (五)', title: '忍野八海 & 環湖絕景', icon: 'Mountain', details: [
+        { time: 'Morning', event: '忍野八海', note: '榮徳駐車場', desc: '富士山融雪形成的八個清泉，水質清澈見底，列入世界遺產。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=榮徳駐車場+Oshino' },
+        { time: 'Lunch', event: 'らぁ麺 八葉', note: '拉麵午餐', desc: '當地好評拉麵，湯頭鮮美，麵條勁道。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=らぁ麺+八葉' },
+        { time: '14:00', event: '富士見橋 觀景台', note: '絕佳拍攝點', desc: '能同時拍到富士山與電車經過的知名攝影點。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Fujimi+Bridge+Observatory' },
+        { time: '15:30', event: '河口湖楓葉迴廊', note: 'Momiji Corridor', desc: '著名的紅葉景點，雖然12月可能已過盛期，但景色依然優美。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Momiji+Corridor+Kawaguchiko' },
+        { time: '16:30', event: 'Tatego-Hama Beach', note: '夕陽湖景', desc: '夕陽西下時，富士山倒映在湖面上的絕景。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Tatego-Hama+Beach' },
+        { time: 'Night', event: 'Motosu Phoenix Hotel', note: '本栖鳳凰酒店', desc: '位於本栖湖畔，環境清幽，適合放鬆身心。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Motosu+Phoenix+Hotel' }
+      ]},
+      { day: 'Day 4', date: '12/6 (六)', title: '音樂森林 & 返回新宿', icon: 'Train', details: [
+        { time: 'Morning', event: '音樂森林美術館', note: '河口湖', desc: '彷彿置身歐洲的庭園，收藏珍貴的自動演奏樂器。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Kawaguchiko+Music+Forest+Museum' },
+        { time: '14:00', event: '還車: ORIX', note: '富士山站前', desc: '歸還車輛，記得加滿油並檢查隨身物品。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=ORIX+Rent+a+Car+Fujisan+Station' },
+        { time: '15:00', event: 'Fuji Excursion 36', note: 'Car 3, 4A/4B', desc: '富士回遊號直達新宿，舒適快捷。', mapUrl: 'https://maps.app.goo.gl/FujisanStation' },
+        { time: '16:58', event: '抵達新宿', note: '前往 BNB', desc: '東京最繁忙的交通樞紐，人潮洶湧。', mapUrl: 'https://maps.app.goo.gl/ShinjukuStation' },
+        { time: '17:30', event: 'Check-in BNB', note: '歌舞伎町', desc: '位於歌舞伎町二丁目，體驗東京的不夜城氛圍。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=2+Chome-8-3+Kabukicho,+Shinjuku+City' },
+        { time: '18:00', event: '惠比壽啤酒紀念館', note: '晚餐 & 參觀', desc: '品嚐新鮮惠比壽啤酒，了解日本啤酒歷史。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Museum+of+Yebisu+Beer' }
+      ]},
+      { day: 'Day 5', date: '12/7 (日)', title: '銀杏林 & 藝術巡禮', icon: 'Camera', details: [
+        { time: 'Breakfast', event: 'Masala Station', note: 'マサラステーション', desc: '道地的印度咖哩，香料味濃郁，開啟活力的一天。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Masala+Station+Shinjuku' },
+        { time: 'Morning', event: '明治神宮外苑', note: '銀杏林', desc: '漫步在金黃色的銀杏大道，感受東京的秋意。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Meiji+Jingu+Gaien+Ginkgo+Avenue' },
+        { time: 'Afternoon', event: '21_21 Design Sight', note: '美術館', desc: '安藤忠雄設計的建築，展出前衛的設計藝術展覽。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=21_21+Design+Sight' },
+        { time: 'Evening', event: '新宿逛街', note: '購物行程', desc: '各大百貨林立，滿足所有的購物需求。', mapUrl: 'https://maps.app.goo.gl/ShinjukuStation' }
+      ]},
+      { day: 'Day 6', date: '12/8 (一)', title: '麻布台之丘 & 返程', icon: 'Plane', details: [
+        { time: 'Morning', event: '早餐 & Check-out', note: '準備出發', desc: '整理行李，辦理退房手續。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=2+Chome-8-3+Kabukicho,+Shinjuku+City' },
+        { time: '09:30', event: '寄放行李', note: '置物櫃導航', desc: '將行李寄放在方便的地點，輕裝遊玩。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=35°41\'29.1"N+139°42\'04.3"E' },
+        { time: '10:00', event: '麻布台之丘', note: '東京新地標', desc: '東京最新最高的大樓，集結藝術、時尚與美食。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=Azabudai+Hills' },
+        { time: 'Afternoon', event: 'teamLab Borderless', note: '數位藝術', desc: '無邊界的數位藝術世界，沉浸式的視覺體驗。', mapUrl: 'https://www.google.com/maps/search/?api=1&query=teamLab+Borderless+Azabudai' },
+        { time: '18:09', event: 'NEX 快線出發', note: '往成田機場', desc: '搭乘特快列車前往機場，結束旅程。', mapUrl: 'https://maps.app.goo.gl/ShinjukuStation' },
+        { time: '19:37', event: '抵達機場 NRT', note: '辦理登機', desc: '最後的免稅品採購，準備搭機返台。', mapUrl: 'https://maps.app.goo.gl/NaritaAirport' },
+        { time: '22:05', event: 'MM627 起飛', note: '樂桃航空 -> TPE', desc: '帶著滿滿的回憶飛往台北桃園。', mapUrl: 'https://maps.app.goo.gl/NaritaAirport' }
+      ]}
+    ];
+
