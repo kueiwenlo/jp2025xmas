@@ -1,3 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global app styles */
+html, body, #root { height: 100%; }
+
+body { @apply bg-gray-50 text-gray-800 antialiased; }
+
+/* Safe-area for iPhone notch */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 24px); }
+
+/* Bottom nav tweaks */
+.bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; border-top: 1px solid rgba(229,231,235,1); background: #ffffff; padding: 6px 1rem; }
+.bottom-nav .tab-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; padding: .65rem .5rem; font-size: .85rem; border-radius: .75rem; }
+
+/* Slightly larger icons and bounce animation */
+.icon-large { width: 1.15rem; height: 1.15rem; }
+.animate-bounce-short { animation: bounce-short 0.4s ease-out infinite; }
+@keyframes bounce-short { 0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)} }
+
+/* Card layout */
+.card { @apply bg-white rounded-2xl p-4 shadow-sm border border-gray-100; }
+
+/* Improve list spacing on small screens */
+.container-sm { max-width: 28rem; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+
+/* Increase touch target for links and buttons */
+a, button { -webkit-tap-highlight-color: rgba(0,0,0,0.05); }
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
